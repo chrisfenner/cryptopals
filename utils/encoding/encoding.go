@@ -1,6 +1,7 @@
 package encoding
 
 import (
+	"cryptopals/utils/channels"
 	"fmt"
 	"io"
 )
@@ -14,27 +15,6 @@ const (
 	// LOWERCASE hex encoding uses all lowercase letters.
 	LOWERCASE
 )
-
-// A ChannelReader reads an output and error channel.
-type ChannelReader struct {
-	o <-chan byte
-	e <-chan error
-}
-
-// Read reads from the ChannelReader.
-func (r *ChannelReader) Read(data []byte) (int, error) {
-	for i := range data {
-		select {
-		case data[i] = <-r.o:
-		case err, ok := <-r.e:
-			if !ok {
-				err = io.EOF
-			}
-			return i, err
-		}
-	}
-	return len(data), nil
-}
 
 // hexEncodeNybble encodes a single nybble of hex.
 // in MUST be a value between 0 and 15
@@ -60,7 +40,7 @@ func hexEncodeNybble(in byte, enc HexEncoding) byte {
 }
 
 // HexEncoder creates a HexEncoder with the specified encoding that reads from a Reader.
-func HexEncoder(enc HexEncoding, r io.Reader) *ChannelReader {
+func HexEncoder(enc HexEncoding, r io.Reader) *channels.Reader {
 	o := make(chan byte)
 	e := make(chan error)
 
@@ -83,7 +63,7 @@ func HexEncoder(enc HexEncoding, r io.Reader) *ChannelReader {
 		}
 	}()
 
-	return &ChannelReader{o, e}
+	return channels.NewReader(o, e)
 }
 
 // hexDecodeNybble decodes a single nybble of hex.
@@ -101,7 +81,7 @@ func hexDecodeNybble(in byte) (byte, error) {
 }
 
 // HexDecoder creates a HexDecoder that reads from a Reader.
-func HexDecoder(r io.Reader) *ChannelReader {
+func HexDecoder(r io.Reader) *channels.Reader {
 	o := make(chan byte)
 	e := make(chan error)
 
@@ -137,7 +117,7 @@ func HexDecoder(r io.Reader) *ChannelReader {
 		}
 	}()
 
-	return &ChannelReader{o, e}
+	return channels.NewReader(o, e)
 }
 
 // Base64Encoding represents a mode for base64 encoding
@@ -215,7 +195,7 @@ func base64Encode3Bytes(in []byte, enc Base64Encoding) [4]byte {
 }
 
 // Base64Encoder creates a Base64Encoder with the specified encoding that reads from a Reader.
-func Base64Encoder(enc Base64Encoding, r io.Reader) *ChannelReader {
+func Base64Encoder(enc Base64Encoding, r io.Reader) *channels.Reader {
 	o := make(chan byte)
 	e := make(chan error)
 
@@ -240,7 +220,7 @@ func Base64Encoder(enc Base64Encoding, r io.Reader) *ChannelReader {
 		}
 	}()
 
-	return &ChannelReader{o, e}
+	return channels.NewReader(o, e)
 }
 
 // base64DecodeHextet decodes a single hextet of base64
@@ -320,7 +300,7 @@ func base64Decode4Chars(in []byte) ([]byte, error) {
 }
 
 // Base64Decoder creates a Base64Decoder that reads from a Reader.
-func Base64Decoder(r io.Reader) *ChannelReader {
+func Base64Decoder(r io.Reader) *channels.Reader {
 	o := make(chan byte)
 	e := make(chan error)
 
@@ -349,5 +329,5 @@ func Base64Decoder(r io.Reader) *ChannelReader {
 		}
 	}()
 
-	return &ChannelReader{o, e}
+	return channels.NewReader(o, e)
 }
