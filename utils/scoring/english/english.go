@@ -1,7 +1,5 @@
 package english
 
-import "fmt"
-
 var (
 	// https://en.wikipedia.org/wiki/Letter_frequency
 	englishFrequencies = map[byte]float64{
@@ -31,6 +29,10 @@ var (
 		'x': .00150,
 		'y': .01974,
 		'z': .00074,
+		// Average word length of English is 4.7 characters
+		' ': .21277,
+		// Catchall for other characters
+		0xff: 0,
 	}
 )
 
@@ -43,7 +45,7 @@ func letter(c byte) (byte, bool) {
 		// force lowercase by setting the 0x20 bit
 		return c | 0x20, true
 	}
-	return c, false
+	return ' ', false
 }
 
 // returns whether the character is ASCII printable
@@ -54,26 +56,20 @@ func ascii(c byte) bool {
 // buildFrequencyTable builds a table of frequencies of the letters in text. Non-letters are
 // ignored. The presence of non-ASCII-printable characters returns an error.
 func buildFrequencyTable(text string) (map[byte]float64, error) {
-	letterCount := 0
+	letterCount := len(text)
 	counts := make(map[byte]float64)
 	for i := range text {
 		if l, ok := letter(text[i]); ok {
-			letterCount++
-			counts[l]++
-		} else if !ascii(text[i]) {
-			return nil, fmt.Errorf("unprintable character %x at index %v", text[i], i)
+			counts[l] += float64(1) / float64(letterCount)
+		} else {
+			counts[0xff] += float64(1) / float64(letterCount)
 		}
-	}
-	// divide all the counts by the number of letters to get relative frequencies
-	for l, f := range counts {
-		counts[l] = f / float64(letterCount)
 	}
 	return counts, nil
 }
 
 // Variance returns the variance of the letter character frequencies present in the given text.
-// Punctuation characters are ignored.
-// The presence of non-ASCII-printable characters returns an error.
+// Non-letter/space characters are treated as junk.
 func Variance(text string) (float64, error) {
 	table, err := buildFrequencyTable(text)
 	if err != nil {
