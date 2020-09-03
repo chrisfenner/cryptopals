@@ -112,7 +112,7 @@ func ebcOrCbcSandwich(input []byte) (*mysteryCiphertext, error) {
 func guessIfEbc(ciphertext []byte) bool {
 	blocks := make(map[[16]byte]bool)
 	// iterate the cipher text 16 bytes at a time and look for duplicate blocks
-	for n := 0; n < len(ciphertext)-16; n++ {
+	for n := 0; n <= len(ciphertext)-16; n++ {
 		block := [16]byte{}
 		copy(block[:], ciphertext[n:n+16])
 		if blocks[block] {
