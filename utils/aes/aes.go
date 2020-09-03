@@ -1,6 +1,7 @@
 package aes
 
 import (
+	"bytes"
 	"cryptopals/utils/channels"
 	"fmt"
 	"io"
@@ -283,12 +284,85 @@ func Ecb(key Key, encrypt bool, r io.Reader) *channels.Reader {
 					e <- fmt.Errorf("padding not supported - supply a multiple of 16 bytes of data")
 					return
 				}
-				ciphertext, err := Rijndael(key, encrypt, buf)
+				output, err := Rijndael(key, encrypt, buf)
 				if err != nil {
 					e <- err
 					return
 				}
-				for _, b := range ciphertext {
+				for _, b := range output {
+					o <- b
+				}
+			}
+			if err != nil {
+				e <- err
+				return
+			}
+		}
+	}()
+
+	return channels.NewReader(o, e)
+}
+
+// Cbc creates an AES-CBC encryption/decryption engine (depends on the value of `encrypt`) using the
+// supplied key.
+// TODO: Make this fancy-elegant by building it out of ECB with some stuff from the io package
+// (without introducing deadlock)
+func Cbc(key Key, iv [16]byte, encrypt bool, r io.Reader) io.Reader {
+	o := make(chan byte)
+	e := make(chan error)
+	ivBuf := bytes.NewBuffer(iv[:])
+
+	// Create a goroutine which encrypts/decrypts data block by block.
+	go func() {
+		defer close(e)
+		defer close(o)
+		var buf [16]byte
+		for {
+			count, err := r.Read(buf[:])
+			if count != 0 {
+				if count < 16 {
+					e <- fmt.Errorf("padding not supported - supply a multiple of 16 bytes of data")
+					return
+				}
+
+				if encrypt {
+					// XOR-in the next IV block
+					var ivBlock [16]byte
+					_, err = ivBuf.Read(ivBlock[:])
+					if err != nil {
+						e <- err
+						return
+					}
+					for i := range buf {
+						buf[i] ^= ivBlock[i]
+					}
+				} else {
+					// Append the IV buffer
+					ivBuf.Write(buf[:])
+				}
+
+				output, err := Rijndael(key, encrypt, buf)
+				if err != nil {
+					e <- err
+					return
+				}
+
+				if encrypt {
+					// Append the IV buffer
+					ivBuf.Write(output[:])
+				} else {
+					// XOR-in the next IV block
+					var ivBlock [16]byte
+					_, err = ivBuf.Read(ivBlock[:])
+					if err != nil {
+						e <- err
+						return
+					}
+					for i := range output {
+						output[i] ^= ivBlock[i]
+					}
+				}
+				for _, b := range output {
 					o <- b
 				}
 			}

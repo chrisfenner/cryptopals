@@ -26,7 +26,8 @@ func TestXor(t *testing.T) {
 			name:        "MismatchedSizes",
 			input1:      []byte{0x01, 0x02, 0x03, 0x00, 0x04},
 			input2:      []byte{0x10, 0x20, 0x01, 0x01},
-			expectError: true,
+			output:      []byte{0x11, 0x22, 0x02, 0x01},
+			expectError: false,
 		},
 	}
 

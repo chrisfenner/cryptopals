@@ -13,7 +13,7 @@ func NewReader(o <-chan byte, e <-chan error) *Reader {
 	return &Reader{o, e}
 }
 
-// Read reads from the ChannelReader.
+// Read reads from the Reader.
 func (r *Reader) Read(data []byte) (int, error) {
 	for i := range data {
 		select {

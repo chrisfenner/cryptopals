@@ -22,7 +22,8 @@ func Xor(r1 io.Reader, r2 io.Reader) *channels.Reader {
 			count1, err1 := r1.Read(buf1)
 			count2, err2 := r2.Read(buf2)
 			if count1 != count2 {
-				e <- fmt.Errorf("buffers not same length")
+				// Xor stops with the earliest terminated reader
+				e <- io.EOF
 				return
 			}
 			if count1 > 0 {
