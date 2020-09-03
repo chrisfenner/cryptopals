@@ -144,8 +144,8 @@ func main() {
 		defer file.Close()
 	}
 	for i := minInputSize; i <= *inputSize; i++ {
-		inputString := strings.Repeat("I LIKE TURTLES! ", (*inputSize/16)+1)
-		inputString = inputString[:*inputSize]
+		inputString := strings.Repeat("I LIKE TURTLES! ", (i/16)+1)
+		inputString = inputString[:i]
 		if *verbose {
 			fmt.Printf("Input string: %v\n", inputString)
 		}
