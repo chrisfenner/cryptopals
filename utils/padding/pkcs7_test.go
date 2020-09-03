@@ -3,6 +3,7 @@ package padding_test
 import (
 	"bytes"
 	"cryptopals/utils/padding"
+	"fmt"
 	"io"
 	"testing"
 )
@@ -10,15 +11,17 @@ import (
 func TestPkcs7(t *testing.T) {
 	data := []byte{0xff, 0xff, 0xff, 0xff}
 	dataBuf := bytes.NewReader(data[:])
-	expected1 := []byte{0xff, 0xff, 0xff, 0xff, 4, 4, 4, 4}
-	expected2 := data
+	expected1 := []byte{0xff, 0xff, 0xff, 0xff, 3, 3, 3}
+	expected2 := []byte{0xff, 0xff, 0xff, 0xff, 4, 4, 4, 4}
 
-	pkcs := padding.Pkcs7(8, dataBuf)
-	outBuf := bytes.NewBuffer(make([]byte, 0))
+	pkcs := padding.Pkcs7(7, dataBuf)
+	outBuf := new(bytes.Buffer)
+
 	_, err := io.Copy(outBuf, pkcs)
 	if err != nil {
 		t.Errorf("Want nil got %v", err)
 	}
+	fmt.Printf("outBuf is %d long\n", len(outBuf.Bytes()))
 	if !bytes.Equal(outBuf.Bytes(), expected1[:]) {
 		t.Errorf("Want %v got %v", expected1, outBuf.Bytes())
 	}

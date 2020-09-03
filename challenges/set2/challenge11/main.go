@@ -19,6 +19,7 @@ var (
 	iterations = flag.Int("iterations", 1000, "how many iterations to test")
 	verbose    = flag.Bool("verbose", false, "whether to print fun and helpful messages")
 	tableFile  = flag.String("table_file", "", "name of the .csv file to write with the results")
+	turtles    = flag.Bool("turtles", false, "Use the naive implementation instead of attacking the padding")
 )
 
 func randomKey() (*aes.Key128, error) {
@@ -78,6 +79,9 @@ func ebcOrCbcSandwich(input []byte) (*mysteryCiphertext, error) {
 	paddedBuf := bytes.NewBuffer(make([]byte, 0))
 	if _, err := io.Copy(paddedBuf, padding.Pkcs7(16, combinedBuf)); err != nil {
 		return nil, err
+	}
+	if *verbose {
+		fmt.Printf("Padded buffer: %v\n", paddedBuf.Bytes())
 	}
 
 	var encryptor io.Reader
@@ -144,14 +148,27 @@ func main() {
 		defer file.Close()
 	}
 	for i := minInputSize; i <= *inputSize; i++ {
-		inputString := strings.Repeat("I LIKE TURTLES! ", (i/16)+1)
-		inputString = inputString[:i]
+		var input []byte
+		if *turtles {
+			inputString := strings.Repeat("I LIKE TURTLES! ", (i/16)+1)
+			input = []byte(inputString[:i])
+		} else {
+			input = make([]byte, i)
+			for j := 0; j < len(input); j++ {
+				input[j] = 0x10
+			}
+		}
 		if *verbose {
-			fmt.Printf("Input string: %v\n", inputString)
+			if *turtles {
+				fmt.Printf("Input: %v\n", string(input))
+
+			} else {
+				fmt.Printf("Input: %v\n", input)
+			}
 		}
 		rightEcb, wrongEcb, rightCbc, wrongCbc := 0, 0, 0, 0
 		for i := 0; i < *iterations; i++ {
-			mc, err := ebcOrCbcSandwich([]byte(inputString))
+			mc, err := ebcOrCbcSandwich(input)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating ciphertext: %v\n", err)
 				os.Exit(1)
