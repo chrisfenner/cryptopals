@@ -16,8 +16,9 @@ import (
 
 var (
 	inputSize  = flag.Int("input_size", 48, "how long the test input can be")
-	iterations = flag.Int("iterations", 10, "how many iterations to test")
+	iterations = flag.Int("iterations", 1000, "how many iterations to test")
 	verbose    = flag.Bool("verbose", false, "whether to print fun and helpful messages")
+	tableFile  = flag.String("table_file", "", "name of the .csv file to write with the results")
 )
 
 func randomKey() (*aes.Key128, error) {
@@ -95,20 +96,19 @@ func ebcOrCbcSandwich(input []byte) (*mysteryCiphertext, error) {
 }
 
 func guessIfEbc(ciphertext []byte) bool {
-	blocks := make(map[[16]byte]int)
-	expectedReps := (*inputSize / 16) - 1
+	blocks := make(map[[16]byte]bool)
 	// iterate the cipher text 16 bytes at a time and look for duplicate blocks
-	for n := 0; n < len(ciphertext)/16; n++ {
+	for n := 0; n < len(ciphertext)-16; n++ {
 		block := [16]byte{}
-		copy(block[:], ciphertext[16*n:16*n+1])
-		if blocks[block] == expectedReps {
+		copy(block[:], ciphertext[n:n+16])
+		if blocks[block] {
 			// didn't expect to see the same block twice except for ECB mode
 			if *verbose {
 				fmt.Printf("Guess ECB\n")
 			}
 			return true
 		}
-		blocks[block]++
+		blocks[block] = true
 	}
 	if *verbose {
 		fmt.Printf("Guess CBC\n")
@@ -120,43 +120,62 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	flag.Parse()
 
-	// Always encrypt at least two blocks of controlled message.
-	if *inputSize < 32 {
-		fmt.Fprintf(os.Stderr, "Please specify input_size of at least 16 (one block)\n")
-		os.Exit(1)
-	}
-	inputString := strings.Repeat("I LIKE TURTLES! ", (*inputSize/16)+1)
-	inputString = inputString[:*inputSize]
-	if *verbose {
-		fmt.Printf("Input string: %v\n", inputString)
-	}
-	rightEcb, wrongEcb, rightCbc, wrongCbc := 0, 0, 0, 0
-	for i := 0; i < *iterations; i++ {
-		mc, err := ebcOrCbcSandwich([]byte(inputString))
+	minInputSize := *inputSize
+	var file *os.File
+	if *tableFile != "" {
+		minInputSize = 1
+		var err error
+		file, err = os.OpenFile(*tableFile, os.O_CREATE|os.O_WRONLY, 0666)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error generating ciphertext: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error opening %v for writing: %v\n", *tableFile, err)
 			os.Exit(1)
 		}
-		guessedEcb := guessIfEbc(mc.ciphertext)
-		if mc.isEcb {
-			if guessedEcb {
-				rightEcb++
-			} else {
-				wrongEcb++
+		fmt.Fprintf(file, "input_length,was_ecb_guessed_ecb,was_ecb_guessed_cbc,was_cbc_guessed_ebc,was_cbc_guessed_cbc\n")
+		defer file.Close()
+	}
+	for i := minInputSize; i <= *inputSize; i++ {
+		inputString := strings.Repeat("I LIKE TURTLES! ", (*inputSize/16)+1)
+		inputString = inputString[:*inputSize]
+		if *verbose {
+			fmt.Printf("Input string: %v\n", inputString)
+		}
+		rightEcb, wrongEcb, rightCbc, wrongCbc := 0, 0, 0, 0
+		for i := 0; i < *iterations; i++ {
+			mc, err := ebcOrCbcSandwich([]byte(inputString))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating ciphertext: %v\n", err)
+				os.Exit(1)
 			}
-		} else {
-			if guessedEcb {
-				wrongCbc++
+			guessedEcb := guessIfEbc(mc.ciphertext)
+			if mc.isEcb {
+				if guessedEcb {
+					rightEcb++
+				} else {
+					wrongEcb++
+				}
 			} else {
-				rightCbc++
+				if guessedEcb {
+					wrongCbc++
+				} else {
+					rightCbc++
+				}
 			}
 		}
+		if *tableFile != "" {
+			// Add the table row
+			fmt.Fprintf(file, "%d,%d,%d,%d,%d\n", i, rightEcb, wrongEcb, wrongCbc, rightCbc)
+			fmt.Printf("Wrote table row for input size %d\n", i)
+		} else if i == *inputSize {
+			// Print the last iteration to stdout
+			fmt.Printf("Total iterations: %d\n", *iterations)
+			fmt.Printf("Input length: %d\n", *inputSize)
+			fmt.Printf("Overall accuracy: %d out of %d (%f%%)\n", rightEcb+rightCbc, *iterations, 100.0*(float64)(rightEcb+rightCbc)/(float64)(*iterations))
+			fmt.Printf("Was ECB, Guessed ECB: %d\n", rightEcb)
+			fmt.Printf("Was ECB, Guessed CBC: %d\n", wrongEcb)
+			fmt.Printf("Was CBC, Guessed ECB: %d\n", wrongCbc)
+			fmt.Printf("Was CBC, Guessed CBC: %d\n", rightCbc)
+		}
+
 	}
-	fmt.Printf("Total iterations: %d\n", *iterations)
-	fmt.Printf("Input length: %d\n", *inputSize)
-	fmt.Printf("Overall accuracy: %d out of %d (%f%%)\n", rightEcb+rightCbc, *iterations, 100.0*(float64)(rightEcb+rightCbc)/(float64)(*iterations))
-	fmt.Printf("Was ECB, Guessed ECB: %d\n", rightEcb)
-	fmt.Printf("Was ECB, Guessed CBC: %d\n", wrongEcb)
-	fmt.Printf("Was CBC, Guessed ECB: %d\n", wrongCbc)
-	fmt.Printf("Was CBC, Guessed CBC: %d\n", rightCbc)
+
 }
