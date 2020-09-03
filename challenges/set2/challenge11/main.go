@@ -65,21 +65,31 @@ func ebcOrCbcSandwich(input []byte) (*mysteryCiphertext, error) {
 	headerReader := bytes.NewReader(header)
 	inputReader := bytes.NewReader(input)
 	trailerReader := bytes.NewReader(trailer)
-	paddedReader := padding.Pkcs7(16, io.MultiReader(headerReader, inputReader, trailerReader))
+	combined := io.MultiReader(headerReader, inputReader, trailerReader)
 	if *verbose {
 		fmt.Printf("Header / input / trailer: %d / %d / %d\n", len(header), len(input), len(trailer))
+	}
+
+	combinedBuf := bytes.NewBuffer(make([]byte, 0))
+	if _, err := io.Copy(combinedBuf, combined); err != nil {
+		return nil, err
+	}
+
+	paddedBuf := bytes.NewBuffer(make([]byte, 0))
+	if _, err := io.Copy(paddedBuf, padding.Pkcs7(16, combinedBuf)); err != nil {
+		return nil, err
 	}
 
 	var encryptor io.Reader
 	wasEcb := false
 	if rand.Intn(2) == 1 {
-		encryptor = aes.Ecb(key, true, paddedReader)
+		encryptor = aes.Ecb(key, true, paddedBuf)
 		wasEcb = true
 		if *verbose {
 			fmt.Printf("Is ECB\n")
 		}
 	} else {
-		encryptor = aes.Cbc(key, iv, true, paddedReader)
+		encryptor = aes.Cbc(key, iv, true, paddedBuf)
 		if *verbose {
 			fmt.Printf("Is CBC\n")
 		}
