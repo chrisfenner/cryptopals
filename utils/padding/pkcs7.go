@@ -31,7 +31,6 @@ func Pkcs7(blockSize byte, r io.Reader) io.Reader {
 		for i := byte(0); i < padCount; i++ {
 			o <- padCount
 		}
-		e <- io.EOF
 	}()
 
 	return channels.NewReader(o, e)

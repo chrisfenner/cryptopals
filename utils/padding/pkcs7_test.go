@@ -3,7 +3,6 @@ package padding_test
 import (
 	"bytes"
 	"cryptopals/utils/padding"
-	"fmt"
 	"io"
 	"testing"
 )
@@ -21,7 +20,6 @@ func TestPkcs7(t *testing.T) {
 	if err != nil {
 		t.Errorf("Want nil got %v", err)
 	}
-	fmt.Printf("outBuf is %d long\n", len(outBuf.Bytes()))
 	if !bytes.Equal(outBuf.Bytes(), expected1[:]) {
 		t.Errorf("Want %v got %v", expected1, outBuf.Bytes())
 	}

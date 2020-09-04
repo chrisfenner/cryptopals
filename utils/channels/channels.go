@@ -17,7 +17,11 @@ func NewReader(o <-chan byte, e <-chan error) *Reader {
 func (r *Reader) Read(data []byte) (int, error) {
 	for i := range data {
 		select {
-		case data[i] = <-r.o:
+		case d, ok := <-r.o:
+			if !ok {
+				return i, io.EOF
+			}
+			data[i] = d
 		case err, ok := <-r.e:
 			if !ok {
 				err = io.EOF
