@@ -1,7 +1,6 @@
 package padding
 
 import (
-	"bytes"
 	"cryptopals/utils/channels"
 	"io"
 )
@@ -15,21 +14,25 @@ func Pkcs7(blockSize byte, r io.Reader) io.Reader {
 	go func() {
 		defer close(e)
 		defer close(o)
-		buf := new(bytes.Buffer)
-		_, err := io.Copy(buf, r)
-		if err != nil {
-			e <- err
-			return
-		}
-		for _, b := range buf.Bytes() {
-			o <- b
-		}
-		padCount := blockSize - (byte(len(buf.Bytes())) % blockSize)
-		if padCount == 0 {
-			padCount = blockSize
-		}
-		for i := byte(0); i < padCount; i++ {
-			o <- padCount
+		count := byte(0)
+		buf := []byte{0}
+		for {
+			c, err := r.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					// Underlying reader is done. Add the padding and then we are done.
+					padCount := blockSize - count
+					for i := byte(0); i < padCount; i++ {
+						o <- padCount
+					}
+				}
+				e <- err
+				return
+			}
+			if c > 0 {
+				o <- buf[0]
+				count = (count + 1) % blockSize
+			}
 		}
 	}()
 
